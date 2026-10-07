@@ -65,16 +65,7 @@
 <body class="flex flex-col h-full w-full text-slate-100">
 
     <!-- FULL-SIZE SPLASH SCREEN -->
-    <div id="splash-screen" class="absolute inset-0 z-50 bg-black flex flex-col justify-between p-4 sm:p-8 transition-opacity duration-700">
-        <div class="absolute inset-0 flex items-center justify-center overflow-hidden">
-            <img src="Cover.jpg" alt="Splash Cover" class="w-full h-full object-contain">
-        </div>
-        <div class="relative z-10 w-full max-w-xs mx-auto mb-4 sm:mb-8">
-            <button id="btn-enter" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-semibold shadow-2xl transition flex items-center justify-center gap-2 border border-indigo-500/50">
-                <span>Enter Studio</span>
-                <span class="text-lg">🎨</span>
-            </button>
-        </div>
+    <div id="splash-screen" class="absolute inset-0 z-50 bg-black flex flex-col items-center justify-center cursor-pointer transition-opacity duration-700" style="background-image: url('Cover.jpg'); background-size: cover; background-position: center; background-repeat: no-repeat;">
     </div>
 
     <!-- GALLERY / HOME SCREEN -->
@@ -681,9 +672,8 @@
 
         const imageUpload = document.getElementById('image-upload');
         const splashScreen = document.getElementById('splash-screen');
-        const btnEnter = document.getElementById('btn-enter');
 
-        // Splash screen interaction
+        // Splash screen interaction (dismissed by clicking/touching anywhere)
         function dismissSplash() {
             splashScreen.style.opacity = '0';
             setTimeout(() => {
@@ -691,10 +681,10 @@
             }, 700);
         }
 
-        btnEnter.onclick = (e) => {
+        splashScreen.addEventListener('pointerdown', (e) => {
             e.stopPropagation();
             dismissSplash();
-        };
+        });
 
         const btnFill = document.getElementById('btn-tool-fill');
         const btnPencil = document.getElementById('btn-tool-pencil');
