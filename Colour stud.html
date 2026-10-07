@@ -1,0 +1,1396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Coloring Studio</title>
+    <!-- Embedded SVG Favicon for Address Bar -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎨</text></svg>">
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        * {
+            -webkit-tap-highlight-color: transparent;
+            user-select: none;
+            -webkit-user-select: none;
+            box-sizing: border-box;
+        }
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            overscroll-behavior: none;
+            touch-action: none;
+            background-color: #0f172a;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .swatch-btn {
+            transition: transform 0.15s ease, box-shadow 0.15s ease;
+        }
+        .swatch-btn.active {
+            transform: scale(1.18);
+            box-shadow: 0 0 0 3px #0f172a, 0 0 0 5px #6366f1;
+        }
+        #canvas-wrapper {
+            background-color: #1e293b;
+            background-image: radial-gradient(#334155 1.5px, transparent 1.5px);
+            background-size: 20px 20px;
+        }
+        #paint-canvas, #line-canvas {
+            touch-action: none;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            border-radius: 0.5rem;
+        }
+        #line-canvas {
+            pointer-events: none;
+        }
+        #canvas-container {
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+            will-change: transform;
+        }
+    </style>
+</head>
+<body class="flex flex-col h-full w-full text-slate-100">
+
+    <!-- GALLERY / HOME SCREEN -->
+    <div id="home-screen" class="absolute inset-0 z-30 bg-slate-900 flex flex-col overflow-y-auto">
+        <header class="bg-slate-800/90 backdrop-blur border-b border-slate-700 p-4 sm:p-6 sticky top-0 z-10 shadow-lg">
+            <div class="max-w-6xl mx-auto flex justify-between items-center">
+                <div class="flex items-center gap-3">
+                    <span class="text-3xl sm:text-4xl">🎨</span>
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-white">Coloring Studio</h1>
+                        <p class="text-xs sm:text-sm text-slate-400">Relaxing adult coloring book with instant save & fill protection</p>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-1 p-4 sm:p-8 max-w-6xl mx-auto w-full">
+            <div class="mb-6 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+                <div>
+                    <h2 class="text-lg font-semibold text-slate-200">Select an Illustration</h2>
+                    <span class="text-xs text-slate-400 bg-slate-800 px-3 py-1 rounded-full border border-slate-700">6 Adult Illustrations + Custom</span>
+                </div>
+                
+                <label class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-lg cursor-pointer text-sm font-medium transition flex items-center justify-center gap-2 shrink-0">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+                    Upload Image
+                    <input type="file" id="image-upload" accept="image/*" class="sr-only">
+                </label>
+            </div>
+            
+            <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                <!-- Gallery items rendered programmatically -->
+            </div>
+        </main>
+    </div>
+
+    <!-- WORKSPACE / COLORING SCREEN -->
+    <div id="workspace-screen" class="absolute inset-0 z-10 flex flex-col h-full w-full bg-slate-950 hidden">
+        
+        <!-- Top Navigation Bar -->
+        <header class="bg-slate-900 border-b border-slate-800 px-3 py-2 sm:px-6 sm:py-3 flex justify-between items-center z-20 shrink-0">
+            <div class="flex items-center gap-2">
+                <button id="btn-back" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 transition flex items-center gap-1.5 text-xs sm:text-sm font-medium">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    <span>Gallery</span>
+                </button>
+                <h2 id="artwork-title" class="text-xs sm:text-base font-semibold text-slate-200 truncate max-w-[120px] sm:max-w-xs ml-2">Coloring Studio</h2>
+            </div>
+
+            <div class="flex items-center gap-1.5 sm:gap-2">
+                <button id="btn-undo" title="Undo Action" class="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition">
+                    <svg class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"/></svg>
+                </button>
+                <button id="btn-clear" title="Reset Canvas" class="px-2.5 py-1.5 rounded-lg bg-red-950/60 hover:bg-red-900/80 text-red-300 border border-red-800/50 text-xs sm:text-sm font-medium transition">
+                    Reset
+                </button>
+                <button id="btn-download" class="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs sm:text-sm font-medium flex items-center gap-1 shadow-md transition">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
+                    <span class="hidden sm:inline">Save PNG</span>
+                </button>
+            </div>
+        </header>
+
+        <!-- Studio Viewport & Palette Sidebar/Bottom Bar -->
+        <div class="flex-1 flex flex-col md:flex-row relative overflow-hidden">
+            
+            <!-- Floating Navigation Controls -->
+            <div class="absolute top-4 left-4 z-20 flex flex-col gap-2 bg-slate-900/90 backdrop-blur p-1.5 rounded-xl border border-slate-700 shadow-xl">
+                <button id="btn-tool-fill" title="Paint Fill Tool" class="p-2.5 rounded-lg bg-indigo-600 text-white transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"/></svg>
+                </button>
+                <button id="btn-tool-pencil" title="Drawing Pencil Tool" class="p-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"/></svg>
+                </button>
+                <button id="btn-tool-line" title="Point-to-Point Line Tool" class="p-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 20L20 4M4 4l16 16"/></svg>
+                </button>
+                <button id="btn-tool-pan" title="Pan / Move Canvas Tool" class="p-2.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 11.5V14m0-2.5v-6a1.5 1.5 0 113 0m-3 6a1.5 1.5 0 00-3 0v2a7.5 7.5 0 0015 0v-5a1.5 1.5 0 00-3 0m-6-3V11m0-5.5a1.5 1.5 0 013 0v3m0 0V11m0-5.5a1.5 1.5 0 013 0v3"/></svg>
+                </button>
+                <div class="w-full h-px bg-slate-700 my-0.5"></div>
+                <button id="btn-zoom-in" title="Zoom In" class="p-2 rounded-lg text-slate-300 hover:bg-slate-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/></svg>
+                </button>
+                <button id="btn-zoom-out" title="Zoom Out" class="p-2 rounded-lg text-slate-300 hover:bg-slate-800 transition">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 12H6"/></svg>
+                </button>
+                <button id="btn-zoom-reset" title="Reset Zoom" class="p-2 rounded-lg text-slate-300 hover:bg-slate-800 text-xs font-bold transition">
+                    1:1
+                </button>
+            </div>
+
+            <!-- Canvas Viewport -->
+            <div id="canvas-wrapper" class="flex-1 relative flex items-center justify-center overflow-hidden p-2 sm:p-4">
+                <div id="canvas-container" class="relative w-full max-w-[800px] aspect-square rounded-lg origin-center cursor-crosshair">
+                    <canvas id="paint-canvas" width="1000" height="1000" class="bg-white"></canvas>
+                    <canvas id="line-canvas" width="1000" height="1000"></canvas>
+                </div>
+            </div>
+
+            <!-- Color Palette Side Bar -->
+            <div class="bg-slate-900 border-t md:border-t-0 md:border-l border-slate-800 w-full md:w-80 h-auto md:h-full p-3 sm:p-4 flex flex-col gap-3 shrink-0 z-20">
+                <div class="flex items-center justify-between gap-2">
+                    <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Color Palette</span>
+                    <select id="palette-select" class="bg-slate-800 text-xs text-slate-200 border border-slate-700 rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        <option value="jewel">Jewel Tones</option>
+                        <option value="botanical">Botanical Garden</option>
+                        <option value="pastels">Pastel Dream</option>
+                        <option value="vivid">Neon Glow</option>
+                    </select>
+                </div>
+
+                <!-- Swatches Grid -->
+                <div id="swatches-grid" class="flex md:grid md:grid-cols-4 gap-2.5 overflow-x-auto md:overflow-y-auto hide-scrollbar py-1 px-1 items-center">
+                    <!-- Swatches injected via JS -->
+                </div>
+
+                <!-- Pencil Size Adjuster -->
+                <div class="pt-2 border-t border-slate-800 flex flex-col gap-1.5">
+                    <div class="flex justify-between items-center text-xs text-slate-400 font-medium px-1">
+                        <span>Pencil & Line Size</span>
+                        <span id="pencil-size-label" class="text-indigo-400 font-bold">6px</span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" class="size-btn flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 transition" data-size="3">Fine</button>
+                        <button type="button" class="size-btn flex-1 py-1 rounded bg-indigo-600 text-xs text-white font-medium transition active" data-size="6">Med</button>
+                        <button type="button" class="size-btn flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 transition" data-size="14">Bold</button>
+                        <input type="range" id="pencil-size-slider" min="1" max="30" value="6" class="w-20 accent-indigo-500 cursor-pointer">
+                    </div>
+                </div>
+
+                <!-- Custom Pick & Eraser Tools -->
+                <div class="pt-2 border-t border-slate-800 flex items-center justify-between gap-3">
+                    <label class="flex-1 flex items-center gap-2.5 bg-slate-800 hover:bg-slate-700/80 p-2 rounded-xl border border-slate-700 cursor-pointer transition">
+                        <div id="custom-color-preview" class="w-6 h-6 rounded-full border border-white/20 shadow-inner bg-indigo-500 shrink-0"></div>
+                        <span class="text-xs text-slate-300 font-medium truncate">Custom Color</span>
+                        <input type="color" id="custom-color-picker" value="#6366f1" class="sr-only">
+                    </label>
+
+                    <button id="btn-eraser" class="p-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 text-slate-300 hover:text-white transition flex items-center justify-center shrink-0" title="Eraser (White Fill)">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const CANVAS_SIZE = 1000;
+
+        // Adult line-art illustrations drawn synchronously with 2D Canvas vector path instructions
+        const ARTWORKS = [
+            {
+                id: 'mandala-lotus',
+                title: 'Mandala Lotus',
+                description: 'Intricate radial lotus petals with outer geometric rings',
+                draw: function(ctx) {
+                    try {
+                        ctx.save();
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 6;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+
+                        const circles = [460, 410, 350, 270, 180, 100, 40];
+                        circles.forEach(r => {
+                            ctx.beginPath();
+                            ctx.arc(500, 500, r, 0, Math.PI * 2);
+                            ctx.stroke();
+                        });
+
+                        ctx.lineWidth = 4;
+                        for (let i = 0; i < 12; i++) {
+                            const angle = (i * Math.PI) / 6;
+                            ctx.save();
+                            ctx.translate(500, 500);
+                            ctx.rotate(angle);
+                            
+                            ctx.beginPath();
+                            ctx.moveTo(0, -270);
+                            ctx.quadraticCurveTo(-45, -340, 0, -410);
+                            ctx.quadraticCurveTo(45, -340, 0, -270);
+                            ctx.stroke();
+
+                            ctx.beginPath();
+                            ctx.moveTo(0, -100);
+                            ctx.quadraticCurveTo(-30, -140, 0, -180);
+                            ctx.quadraticCurveTo(30, -140, 0, -100);
+                            ctx.stroke();
+
+                            ctx.beginPath();
+                            ctx.arc(0, -225, 10, 0, Math.PI * 2);
+                            ctx.stroke();
+
+                            ctx.restore();
+                        }
+                        ctx.restore();
+                    } catch(e) {
+                        console.error('Error drawing artwork mandala-lotus', e);
+                    }
+                }
+            },
+            {
+                id: 'sacred-owl',
+                title: 'Sacred Geometry Owl',
+                description: 'Polygonal owl with detailed geometric feather motifs',
+                draw: function(ctx) {
+                    try {
+                        ctx.save();
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 5;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+
+                        ctx.beginPath();
+                        ctx.arc(500, 500, 460, 0, Math.PI * 2);
+                        ctx.lineWidth = 8;
+                        ctx.stroke();
+                        ctx.lineWidth = 5;
+
+                        ctx.beginPath();
+                        ctx.moveTo(500, 150); ctx.lineTo(375, 250); ctx.lineTo(415, 360);
+                        ctx.lineTo(500, 320); ctx.lineTo(585, 360); ctx.lineTo(625, 250);
+                        ctx.closePath();
+                        ctx.stroke();
+
+                        [425, 575].forEach(cx => {
+                            [48, 30, 14].forEach(r => {
+                                ctx.beginPath();
+                                ctx.arc(cx, 285, r, 0, Math.PI * 2);
+                                ctx.stroke();
+                            });
+                        });
+
+                        ctx.beginPath();
+                        ctx.moveTo(500, 285); ctx.lineTo(480, 350); ctx.lineTo(500, 380); ctx.lineTo(520, 350);
+                        ctx.closePath();
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(375, 360);
+                        ctx.bezierCurveTo(330, 440, 310, 600, 400, 780);
+                        ctx.lineTo(500, 860);
+                        ctx.lineTo(600, 780);
+                        ctx.bezierCurveTo(690, 600, 670, 440, 625, 360);
+                        ctx.stroke();
+
+                        const yLevels = [420, 470, 520, 570, 620, 670, 720];
+                        yLevels.forEach(y => {
+                            ctx.beginPath();
+                            ctx.moveTo(400, y);
+                            ctx.quadraticCurveTo(500, y + 40, 600, y);
+                            ctx.stroke();
+                        });
+
+                        ctx.beginPath();
+                        ctx.rect(150, 800, 700, 30);
+                        ctx.stroke();
+
+                        ctx.restore();
+                    } catch(e) {
+                        console.error('Error drawing artwork sacred-owl', e);
+                    }
+                }
+            },
+            {
+                id: 'botanical-rose',
+                title: 'Botanical Rose & Butterfly',
+                description: 'Detailed garden rose with lush leaves and butterfly',
+                draw: function(ctx) {
+                    try {
+                        ctx.save();
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 5;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+
+                        ctx.beginPath();
+                        ctx.roundRect(70, 70, 860, 860, 30);
+                        ctx.lineWidth = 8;
+                        ctx.stroke();
+                        ctx.lineWidth = 5;
+
+                        ctx.beginPath(); ctx.arc(500, 450, 160, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(500, 450, 100, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(500, 450, 50, 0, Math.PI * 2); ctx.stroke();
+
+                        for(let i=0; i<8; i++) {
+                            const angle = (i * Math.PI) / 4;
+                            ctx.save();
+                            ctx.translate(500, 450);
+                            ctx.rotate(angle);
+                            ctx.beginPath();
+                            ctx.moveTo(0, -160);
+                            ctx.quadraticCurveTo(120, -240, 0, -280);
+                            ctx.quadraticCurveTo(-120, -240, 0, -160);
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+
+                        ctx.lineWidth = 8;
+                        ctx.beginPath();
+                        ctx.moveTo(500, 610);
+                        ctx.quadraticCurveTo(480, 750, 520, 880);
+                        ctx.stroke();
+                        ctx.lineWidth = 5;
+
+                        ctx.beginPath();
+                        ctx.moveTo(485, 660);
+                        ctx.quadraticCurveTo(300, 620, 240, 720);
+                        ctx.quadraticCurveTo(380, 780, 485, 660);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(510, 730);
+                        ctx.quadraticCurveTo(700, 690, 760, 790);
+                        ctx.quadraticCurveTo(600, 840, 510, 730);
+                        ctx.stroke();
+
+                        ctx.restore();
+                    } catch(e) {
+                        console.error('Error drawing artwork botanical-rose', e);
+                    }
+                }
+            },
+            {
+                id: 'stained-glass',
+                title: 'Stained Glass Arch',
+                description: 'Gothic cathedral stained glass arch with mosaic panels',
+                draw: function(ctx) {
+                    try {
+                        ctx.save();
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 6;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+
+                        ctx.beginPath();
+                        ctx.moveTo(150, 900);
+                        ctx.lineTo(150, 450);
+                        ctx.arc(500, 450, 350, Math.PI, 0);
+                        ctx.lineTo(850, 900);
+                        ctx.closePath();
+                        ctx.lineWidth = 10;
+                        ctx.stroke();
+                        ctx.lineWidth = 6;
+
+                        ctx.beginPath(); ctx.arc(500, 400, 160, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(500, 400, 90, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(500, 400, 30, 0, Math.PI * 2); ctx.stroke();
+
+                        for(let i=0; i<12; i++) {
+                            const angle = (i * Math.PI) / 6;
+                            ctx.beginPath();
+                            ctx.moveTo(500 + Math.cos(angle)*30, 400 + Math.sin(angle)*30);
+                            ctx.lineTo(500 + Math.cos(angle)*160, 400 + Math.sin(angle)*160);
+                            ctx.stroke();
+                        }
+
+                        [320, 500, 680].forEach(x => {
+                            ctx.beginPath(); ctx.moveTo(x, 560); ctx.lineTo(x, 900); ctx.stroke();
+                        });
+
+                        [630, 720, 810].forEach(y => {
+                            ctx.beginPath(); ctx.moveTo(150, y); ctx.lineTo(850, y); ctx.stroke();
+                        });
+
+                        ctx.restore();
+                    } catch(e) {
+                        console.error('Error drawing artwork stained-glass', e);
+                    }
+                }
+            },
+            {
+                id: 'sun-moon',
+                title: 'Celestial Sun & Moon',
+                description: 'Interlocking radiant sun and crescent moon faces',
+                draw: function(ctx) {
+                    try {
+                        ctx.save();
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 6;
+                        ctx.lineCap = 'round';
+
+                        ctx.beginPath(); ctx.arc(500, 500, 460, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(500, 500, 410, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(500, 500, 280, 0, Math.PI * 2); ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.arc(500, 500, 280, -Math.PI/2, Math.PI/2, false);
+                        ctx.arc(500, 500, 200, Math.PI/2, -Math.PI/2, true);
+                        ctx.stroke();
+
+                        ctx.beginPath(); ctx.arc(570, 430, 20, 0, Math.PI * 2); ctx.stroke();
+                        ctx.beginPath(); ctx.arc(570, 430, 8, 0, Math.PI * 2); ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.moveTo(530, 530);
+                        ctx.quadraticCurveTo(580, 560, 620, 520);
+                        ctx.stroke();
+
+                        for(let i=0; i<16; i++) {
+                            const angle = (i * Math.PI) / 8;
+                            ctx.save();
+                            ctx.translate(500, 500);
+                            ctx.rotate(angle);
+                            ctx.beginPath();
+                            ctx.moveTo(0, -280);
+                            ctx.lineTo(-25, -340);
+                            ctx.lineTo(0, -410);
+                            ctx.lineTo(25, -340);
+                            ctx.closePath();
+                            ctx.stroke();
+                            ctx.restore();
+                        }
+
+                        ctx.restore();
+                    } catch(e) {
+                        console.error('Error drawing artwork sun-moon', e);
+                    }
+                }
+            },
+            {
+                id: 'koi-pond',
+                title: 'Japanese Koi Pond',
+                description: 'Water ripples, lotus pads, and dual swimming koi fish',
+                draw: function(ctx) {
+                    try {
+                        ctx.save();
+                        ctx.strokeStyle = '#000000';
+                        ctx.lineWidth = 6;
+                        ctx.lineCap = 'round';
+                        ctx.lineJoin = 'round';
+
+                        ctx.beginPath();
+                        ctx.roundRect(50, 50, 900, 900, 40);
+                        ctx.stroke();
+
+                        const waveYs = [200, 380, 560, 740];
+                        waveYs.forEach(y => {
+                            ctx.beginPath();
+                            ctx.moveTo(80, y);
+                            ctx.bezierCurveTo(280, y - 60, 480, y + 60, 680, y - 60);
+                            ctx.bezierCurveTo(780, y - 100, 850, y - 30, 920, y);
+                            ctx.stroke();
+                        });
+
+                        ctx.beginPath();
+                        ctx.moveTo(600, 220);
+                        ctx.bezierCurveTo(750, 300, 710, 500, 540, 540);
+                        ctx.bezierCurveTo(460, 560, 420, 500, 435, 440);
+                        ctx.bezierCurveTo(460, 340, 520, 180, 600, 220);
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.moveTo(600, 220);
+                        ctx.quadraticCurveTo(720, 140, 760, 180);
+                        ctx.quadraticCurveTo(700, 240, 600, 220);
+                        ctx.stroke();
+
+                        ctx.beginPath(); ctx.arc(520, 480, 8, 0, Math.PI * 2); ctx.fill();
+
+                        ctx.beginPath();
+                        ctx.arc(260, 260, 120, 0.4, Math.PI * 1.8);
+                        ctx.lineTo(260, 260);
+                        ctx.closePath();
+                        ctx.stroke();
+
+                        ctx.beginPath();
+                        ctx.arc(750, 750, 100, 2.2, Math.PI * 3.6);
+                        ctx.lineTo(750, 750);
+                        ctx.closePath();
+                        ctx.stroke();
+
+                        ctx.restore();
+                    } catch(e) {
+                        console.error('Error drawing artwork koi-pond', e);
+                    }
+                }
+            }
+        ];
+
+        // Curated Color Palettes
+        const PALETTES = {
+            jewel: ['#991b1b', '#c2410c', '#d97706', '#15803d', '#047857', '#0369a1', '#1d4ed8', '#4338ca', '#6b21a8', '#831843', '#1e293b', '#ffffff'],
+            botanical: ['#2d6a4f', '#40916c', '#52b788', '#74c69d', '#95d5b2', '#d8f3dc', '#b7094c', '#a71e34', '#892b31', '#64152b', '#e9c46a', '#ffffff'],
+            pastels: ['#ffadad', '#ffd6a5', '#fdffb6', '#caffbf', '#9bf6ff', '#a0c4ff', '#bdb2ff', '#ffc6ff', '#ffffff', '#d8e2dc', '#ffe5d9', '#f4acb7'],
+            vivid: ['#ff0055', '#ff5000', '#ffcc00', '#00ff66', '#00ffff', '#0066ff', '#9900ff', '#ff00cc', '#ffffff', '#111111', '#666666', '#cccccc']
+        };
+
+        let customArtworks = [];
+        try {
+            const storedArts = localStorage.getItem('coloring_studio_custom_arts');
+            if (storedArts) customArtworks = JSON.parse(storedArts);
+        } catch(e) { console.warn('Could not load custom artworks'); }
+
+        let currentArtwork = null;
+        let currentColor = PALETTES.jewel[0];
+        let currentTool = 'fill';
+        let pencilSize = 6;
+        let isDrawing = false;
+        let lastX = 0;
+        let lastY = 0;
+        let lineStartPoint = null;
+        let lineSnapshot = null;
+
+        let undoStack = [];
+        const MAX_UNDO = 15;
+
+        // Strict Concurrency & Debounce Control
+        let isProcessing = false;
+        let lastTapTime = 0;
+
+        let scale = 1;
+        let panX = 0;
+        let panY = 0;
+        let isPointerDown = false;
+        let pointerStartX = 0;
+        let pointerStartY = 0;
+        let initialPanX = 0;
+        let initialPanY = 0;
+
+        const paintCanvas = document.getElementById('paint-canvas');
+        const paintCtx = paintCanvas.getContext('2d', { willReadFrequently: true });
+        
+        const lineCanvas = document.getElementById('line-canvas');
+        const lineCtx = lineCanvas.getContext('2d', { willReadFrequently: true });
+
+        const canvasContainer = document.getElementById('canvas-container');
+        const homeScreen = document.getElementById('home-screen');
+        const workspaceScreen = document.getElementById('workspace-screen');
+        const galleryGrid = document.getElementById('gallery-grid');
+        const viewport = document.getElementById('canvas-wrapper');
+        const paletteSelect = document.getElementById('palette-select');
+        const swatchesGrid = document.getElementById('swatches-grid');
+        const customColorPicker = document.getElementById('custom-color-picker');
+        const customColorPreview = document.getElementById('custom-color-preview');
+        const artworkTitle = document.getElementById('artwork-title');
+
+        const imageUpload = document.getElementById('image-upload');
+
+        const btnFill = document.getElementById('btn-tool-fill');
+        const btnPencil = document.getElementById('btn-tool-pencil');
+        const btnLine = document.getElementById('btn-tool-line');
+        const btnPan = document.getElementById('btn-tool-pan');
+        const btnZoomIn = document.getElementById('btn-zoom-in');
+        const btnZoomOut = document.getElementById('btn-zoom-out');
+        const btnZoomReset = document.getElementById('btn-zoom-reset');
+        const btnUndo = document.getElementById('btn-undo');
+        const btnClear = document.getElementById('btn-clear');
+        const btnDownload = document.getElementById('btn-download');
+        const btnBack = document.getElementById('btn-back');
+        const btnEraser = document.getElementById('btn-eraser');
+        const pencilSizeSlider = document.getElementById('pencil-size-slider');
+        const pencilSizeLabel = document.getElementById('pencil-size-label');
+        const sizeBtns = document.querySelectorAll('.size-btn');
+
+        // Storage Management
+        function safeSetStorage(key, value) {
+            try {
+                localStorage.setItem(key, value);
+            } catch(e) {
+                console.warn('LocalStorage limit reached or disabled', e);
+            }
+        }
+
+        function safeGetStorage(key) {
+            try {
+                return localStorage.getItem(key);
+            } catch(e) {
+                return null;
+            }
+        }
+
+        // Build Home Gallery with Live Save Thumbnails
+        function buildGallery() {
+            try {
+                galleryGrid.innerHTML = '';
+                const allArts = [...ARTWORKS, ...customArtworks];
+                
+                allArts.forEach(art => {
+                    const thumbCanvas = document.createElement('canvas');
+                    thumbCanvas.width = 400;
+                    thumbCanvas.height = 400;
+                    const tCtx = thumbCanvas.getContext('2d');
+                    
+                    tCtx.fillStyle = '#ffffff';
+                    tCtx.fillRect(0, 0, 400, 400);
+
+                    const savedData = safeGetStorage(`coloring_studio_save_${art.id}`);
+
+                    const finalizeCard = () => {
+                        renderGalleryCard(art, thumbCanvas.toDataURL(), !!savedData);
+                    };
+
+                    const drawLineArt = () => {
+                        if (art.isCustom) {
+                            const lineImg = new Image();
+                            lineImg.onload = () => {
+                                tCtx.drawImage(lineImg, 0, 0, 400, 400);
+                                finalizeCard();
+                            };
+                            lineImg.onerror = finalizeCard;
+                            lineImg.src = art.lineArtDataUrl;
+                        } else {
+                            tCtx.save();
+                            tCtx.scale(0.4, 0.4);
+                            art.draw(tCtx);
+                            tCtx.restore();
+                            finalizeCard();
+                        }
+                    };
+
+                    if (savedData) {
+                        const savedImg = new Image();
+                        savedImg.onload = () => {
+                            tCtx.drawImage(savedImg, 0, 0, 400, 400);
+                            drawLineArt();
+                        };
+                        savedImg.onerror = drawLineArt;
+                        savedImg.src = savedData;
+                    } else {
+                        drawLineArt();
+                    }
+                });
+            } catch(e) {
+                console.error('Error rendering gallery', e);
+            }
+        }
+
+        function renderGalleryCard(art, dataUrl, hasSave) {
+            let card = document.getElementById(`card-${art.id}`);
+            if (!card) {
+                card = document.createElement('div');
+                card.id = `card-${art.id}`;
+                card.className = "bg-slate-800 border border-slate-700/85 rounded-2xl overflow-hidden hover:border-indigo-500/85 transition-all duration-300 shadow-lg flex flex-col cursor-pointer group";
+                card.onclick = () => launchStudio(art);
+                galleryGrid.appendChild(card);
+            }
+
+            let deleteBtn = '';
+            if (art.isCustom) {
+                deleteBtn = `<button onclick="deleteCustomArt(event, '${art.id}')" title="Delete custom art" class="absolute top-3 left-3 bg-red-600/90 hover:bg-red-500 text-white p-1.5 rounded-full shadow-lg z-10 transition hover:scale-110">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>`;
+            }
+
+            card.innerHTML = `
+                <div class="h-60 sm:h-64 w-full bg-white p-4 flex items-center justify-center relative overflow-hidden">
+                    ${deleteBtn}
+                    <img src="${dataUrl}" alt="${art.title}" class="max-h-full max-w-full object-contain group-hover:scale-105 transition-transform duration-500">
+                    ${hasSave ? '<span class="absolute top-3 right-3 bg-emerald-600 text-white text-xs font-bold px-2.5 py-1 rounded-full shadow">In Progress</span>' : ''}
+                </div>
+                <div class="p-5 flex flex-col justify-between flex-1 bg-slate-800">
+                    <div>
+                        <h3 class="text-lg font-bold text-slate-100 group-hover:text-indigo-400 transition-colors truncate">${art.title}</h3>
+                        <p class="text-xs text-slate-400 mt-1 truncate">${art.description}</p>
+                    </div>
+                    <div class="mt-4 flex justify-between items-center text-xs font-semibold text-indigo-400">
+                        <span>Open Studio &rarr;</span>
+                        <span class="w-8 h-8 rounded-full bg-slate-700 flex items-center justify-center group-hover:bg-indigo-600 group-hover:text-white transition-colors">🎨</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        window.deleteCustomArt = function(event, id) {
+            event.stopPropagation();
+            customArtworks = customArtworks.filter(a => a.id !== id);
+            safeSetStorage('coloring_studio_custom_arts', JSON.stringify(customArtworks));
+            localStorage.removeItem(`coloring_studio_save_${id}`);
+            buildGallery();
+        };
+
+        function populatePalette(key) {
+            try {
+                swatchesGrid.innerHTML = '';
+                const list = PALETTES[key] || PALETTES.jewel;
+                list.forEach(color => {
+                    const btn = document.createElement('button');
+                    btn.type = 'button';
+                    btn.className = `swatch-btn w-9 h-9 sm:w-10 sm:h-10 rounded-full shrink-0 border border-black/20 cursor-pointer ${color.toLowerCase() === currentColor.toLowerCase() ? 'active' : ''}`;
+                    btn.style.backgroundColor = color;
+                    btn.onclick = (e) => {
+                        e.stopPropagation();
+                        selectColor(color);
+                    };
+                    swatchesGrid.appendChild(btn);
+                });
+            } catch(e) {
+                console.error('Error populating palette', e);
+            }
+        }
+
+        function selectColor(hex) {
+            try {
+                if (!hex || typeof hex !== 'string') return;
+                currentColor = hex;
+                customColorPreview.style.backgroundColor = hex;
+                if (hex.length === 7 && hex.startsWith('#')) {
+                    customColorPicker.value = hex;
+                }
+
+                document.querySelectorAll('.swatch-btn').forEach(btn => {
+                    const bg = btn.style.backgroundColor;
+                    if (bg === hex || rgbToHex(bg) === hex.toLowerCase()) {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                });
+            } catch(e) {
+                console.error('Error selecting color', e);
+            }
+        }
+
+        function rgbToHex(rgb) {
+            if (!rgb || !rgb.startsWith('rgb')) return rgb;
+            const nums = rgb.match(/\d+/g);
+            if (!nums || nums.length < 3) return rgb;
+            return "#" + ((1 << 24) + (parseInt(nums[0]) << 16) + (parseInt(nums[1]) << 8) + parseInt(nums[2])).toString(16).slice(1);
+        }
+
+        function setPencilSize(size) {
+            pencilSize = parseInt(size, 10);
+            if (pencilSizeLabel) pencilSizeLabel.innerText = pencilSize + 'px';
+            if (pencilSizeSlider) pencilSizeSlider.value = pencilSize;
+            sizeBtns.forEach(btn => {
+                if (parseInt(btn.getAttribute('data-size'), 10) === pencilSize) {
+                    btn.className = "size-btn flex-1 py-1 rounded bg-indigo-600 text-xs text-white font-medium transition active";
+                } else {
+                    btn.className = "size-btn flex-1 py-1 rounded bg-slate-800 hover:bg-slate-700 text-xs text-slate-300 border border-slate-700 transition";
+                }
+            });
+        }
+
+        async function launchStudio(artwork) {
+            try {
+                currentArtwork = artwork;
+                artworkTitle.innerText = artwork.title;
+                homeScreen.classList.add('hidden');
+                workspaceScreen.classList.remove('hidden');
+
+                undoStack = [];
+                updateUndoUI();
+                resetZoomPan();
+                lineStartPoint = null;
+                lineSnapshot = null;
+
+                paintCtx.fillStyle = '#ffffff';
+                paintCtx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                lineCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+                const savedData = safeGetStorage(`coloring_studio_save_${artwork.id}`);
+                if (savedData) {
+                    await new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            paintCtx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                            resolve();
+                        };
+                        img.onerror = resolve;
+                        img.src = savedData;
+                    });
+                }
+
+                if (artwork.isCustom) {
+                    await new Promise((resolve) => {
+                        const img = new Image();
+                        img.onload = () => {
+                            lineCtx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                            resolve();
+                        };
+                        img.onerror = resolve;
+                        img.src = artwork.lineArtDataUrl;
+                    });
+                } else {
+                    artwork.draw(lineCtx);
+                }
+
+                // Push initial baseline state so the first undo goes back to the initial loaded canvas instead of nuking everything
+                undoStack.push(paintCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE));
+                updateUndoUI();
+
+            } catch(e) {
+                console.error('Error launching studio', e);
+            }
+        }
+
+        function saveProgress() {
+            if (!currentArtwork) return;
+            try {
+                const dataUrl = paintCanvas.toDataURL('image/png');
+                safeSetStorage(`coloring_studio_save_${currentArtwork.id}`, dataUrl);
+            } catch(e) {
+                console.warn('Could not save progress', e);
+            }
+        }
+
+        function pushUndo() {
+            try {
+                if (undoStack.length >= MAX_UNDO) undoStack.shift();
+                undoStack.push(paintCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE));
+                updateUndoUI();
+            } catch(e) {
+                console.error('Error pushing to undo stack', e);
+            }
+        }
+
+        function undo() {
+            try {
+                if (undoStack.length <= 1 || isProcessing) return;
+                undoStack.pop();
+                const prev = undoStack[undoStack.length - 1];
+                paintCtx.putImageData(prev, 0, 0);
+                saveProgress();
+                updateUndoUI();
+                lineStartPoint = null;
+                if (lineSnapshot) {
+                    lineCtx.putImageData(lineSnapshot, 0, 0);
+                    lineSnapshot = null;
+                }
+            } catch(e) {
+                console.error('Error executing undo', e);
+            }
+        }
+
+        function updateUndoUI() {
+            btnUndo.disabled = undoStack.length <= 1;
+        }
+
+        function hexToRgba(hex) {
+            let h = hex.replace('#', '');
+            if (h.length === 3) h = h.split('').map(c => c + c).join('');
+            const num = parseInt(h, 16);
+            return [(num >> 16) & 255, (num >> 8) & 255, num & 255, 255];
+        }
+
+        /**
+         * ZERO-FREEZE SCANLINE FLOOD FILL
+         */
+        function executeFloodFill(startX, startY, fillHex) {
+            if (isProcessing) return;
+            isProcessing = true;
+
+            requestAnimationFrame(() => {
+                try {
+                    if (startX < 0 || startX >= CANVAS_SIZE || startY < 0 || startY >= CANVAS_SIZE) {
+                        isProcessing = false;
+                        return;
+                    }
+
+                    const paintImgData = paintCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                    const lineImgData = lineCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+
+                    const paintBytes = paintImgData.data;
+                    const lineBytes = lineImgData.data;
+
+                    const [fr, fg, fb, fa] = hexToRgba(fillHex);
+
+                    const startIdx = (startY * CANVAS_SIZE + startX) * 4;
+
+                    const tr = paintBytes[startIdx];
+                    const tg = paintBytes[startIdx + 1];
+                    const tb = paintBytes[startIdx + 2];
+                    const ta = paintBytes[startIdx + 3];
+
+                    const isWall = (idx) => {
+                        const alpha = lineBytes[idx + 3];
+                        if (alpha < 50) return false;
+                        const r = lineBytes[idx];
+                        const g = lineBytes[idx + 1];
+                        const b = lineBytes[idx + 2];
+                        return (0.299 * r + 0.587 * g + 0.114 * b) < 120;
+                    };
+
+                    if (isWall(startIdx)) {
+                        isProcessing = false;
+                        return;
+                    }
+
+                    if (tr === fr && tg === fg && tb === fb && ta === fa) {
+                        isProcessing = false;
+                        return;
+                    }
+
+                    pushUndo();
+
+                    const matchesTarget = (idx) => {
+                        return paintBytes[idx] === tr &&
+                               paintBytes[idx + 1] === tg &&
+                               paintBytes[idx + 2] === tb &&
+                               paintBytes[idx + 3] === ta;
+                    };
+
+                    const setFillColor = (idx) => {
+                        paintBytes[idx] = fr;
+                        paintBytes[idx + 1] = fg;
+                        paintBytes[idx + 2] = fb;
+                        paintBytes[idx + 3] = fa;
+                    };
+
+                    const stack = [[startX, startX, startY, 1], [startX, startX, startY - 1, -1]];
+                    setFillColor(startIdx);
+
+                    let ops = 0;
+                    const maxOps = 120000;
+                    const startTime = performance.now();
+
+                    while (stack.length > 0) {
+                        ops++;
+                        if (ops > maxOps || (ops % 1000 === 0 && performance.now() - startTime > 50)) {
+                            break;
+                        }
+
+                        const [x1, x2, y, dy] = stack.pop();
+                        let x = x1;
+
+                        if (y < 0 || y >= CANVAS_SIZE) continue;
+
+                        while (x > 0) {
+                            const idx = (y * CANVAS_SIZE + (x - 1)) * 4;
+                            if (!matchesTarget(idx) || isWall(idx)) break;
+                            setFillColor(idx);
+                            x--;
+                        }
+
+                        let spanStart = x;
+                        if (spanStart < x1) {
+                            stack.push([spanStart, x1 - 1, y - dy, -dy]);
+                        }
+
+                        x = x1;
+                        while (x <= x2) {
+                            while (x < CANVAS_SIZE) {
+                                const idx = (y * CANVAS_SIZE + x) * 4;
+                                if (!matchesTarget(idx) || isWall(idx)) break;
+                                setFillColor(idx);
+                                x++;
+                            }
+
+                            if (x > spanStart) {
+                                stack.push([spanStart, x - 1, y + dy, dy]);
+                            }
+
+                            if (x - 1 > x2) {
+                                stack.push([x2 + 1, x - 1, y - dy, -dy]);
+                            }
+
+                            x++;
+                            while (x <= x2) {
+                                const idx = (y * CANVAS_SIZE + x) * 4;
+                                if (matchesTarget(idx) && !isWall(idx)) break;
+                                x++;
+                            }
+                            spanStart = x;
+                        }
+                    }
+
+                    paintCtx.putImageData(paintImgData, 0, 0);
+                    saveProgress();
+
+                    if (window.navigator && window.navigator.vibrate) {
+                        window.navigator.vibrate(12);
+                    }
+                } catch(e) {
+                    console.error('Error executing flood fill', e);
+                } finally {
+                    isProcessing = false;
+                }
+            });
+        }
+
+        function getCanvasPoint(clientX, clientY) {
+            const rect = paintCanvas.getBoundingClientRect();
+            const scaleX = CANVAS_SIZE / rect.width;
+            const scaleY = CANVAS_SIZE / rect.height;
+
+            const x = Math.round((clientX - rect.left) * scaleX);
+            const y = Math.round((clientY - rect.top) * scaleY);
+            return { x, y };
+        }
+
+        function applyCanvasTransform() {
+            canvasContainer.style.transform = `translate(${panX}px, ${panY}px) scale(${scale})`;
+        }
+
+        function resetZoomPan() {
+            scale = 1;
+            panX = 0;
+            panY = 0;
+            applyCanvasTransform();
+        }
+
+        function setToolMode(mode) {
+            currentTool = mode;
+            if (currentTool !== 'line') {
+                lineStartPoint = null;
+                if (lineSnapshot) {
+                    lineCtx.putImageData(lineSnapshot, 0, 0);
+                    lineSnapshot = null;
+                }
+            }
+
+            btnFill.className = "p-2.5 rounded-lg " + (mode === 'fill' ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800") + " transition";
+            btnPencil.className = "p-2.5 rounded-lg " + (mode === 'pencil' ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800") + " transition";
+            btnLine.className = "p-2.5 rounded-lg " + (mode === 'line' ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800") + " transition";
+            btnPan.className = "p-2.5 rounded-lg " + (mode === 'pan' ? "bg-indigo-600 text-white" : "text-slate-400 hover:text-white hover:bg-slate-800") + " transition";
+
+            if (mode === 'fill' || mode === 'pencil' || mode === 'line') {
+                canvasContainer.style.cursor = 'crosshair';
+            } else {
+                canvasContainer.style.cursor = 'grab';
+            }
+        }
+
+        // Pointer event registration
+        canvasContainer.addEventListener('pointerdown', (e) => {
+            if (!e.isPrimary) return;
+            isPointerDown = true;
+            pointerStartX = e.clientX - panX;
+            pointerStartY = e.clientY - panY;
+            initialPanX = panX;
+            initialPanY = panY;
+
+            if (currentTool === 'pencil') {
+                isDrawing = true;
+                pushUndo();
+                const pt = getCanvasPoint(e.clientX, e.clientY);
+                lastX = pt.x;
+                lastY = pt.y;
+
+                paintCtx.save();
+                paintCtx.fillStyle = currentColor;
+                paintCtx.beginPath();
+                paintCtx.arc(lastX, lastY, pencilSize / 2, 0, Math.PI * 2);
+                paintCtx.fill();
+                paintCtx.restore();
+            } else if (currentTool === 'line') {
+                const pt = getCanvasPoint(e.clientX, e.clientY);
+                if (!lineStartPoint) {
+                    pushUndo();
+                    lineStartPoint = pt;
+                    // Secure a snapshot of the line art so preview rendering never destroys outlines
+                    lineSnapshot = lineCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                } else {
+                    // Restore snapshot to clean up previous preview lines
+                    if (lineSnapshot) {
+                        lineCtx.putImageData(lineSnapshot, 0, 0);
+                    }
+
+                    // Draw permanent straight line onto paint layer
+                    paintCtx.save();
+                    paintCtx.strokeStyle = currentColor;
+                    paintCtx.lineWidth = pencilSize;
+                    paintCtx.lineCap = 'round';
+                    paintCtx.lineJoin = 'round';
+                    paintCtx.beginPath();
+                    paintCtx.moveTo(lineStartPoint.x, lineStartPoint.y);
+                    paintCtx.lineTo(pt.x, pt.y);
+                    paintCtx.stroke();
+                    paintCtx.restore();
+
+                    saveProgress();
+                    
+                    lineStartPoint = pt;
+                    lineSnapshot = lineCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                }
+            }
+        });
+
+        window.addEventListener('pointermove', (e) => {
+            if (!isPointerDown || !e.isPrimary) return;
+            if (currentTool === 'pencil' && isDrawing) {
+                const pt = getCanvasPoint(e.clientX, e.clientY);
+                paintCtx.save();
+                paintCtx.strokeStyle = currentColor;
+                paintCtx.lineWidth = pencilSize;
+                paintCtx.lineCap = 'round';
+                paintCtx.lineJoin = 'round';
+                paintCtx.beginPath();
+                paintCtx.moveTo(lastX, lastY);
+                paintCtx.lineTo(pt.x, pt.y);
+                paintCtx.stroke();
+                paintCtx.restore();
+                lastX = pt.x;
+                lastY = pt.y;
+            } else if (currentTool === 'line' && lineStartPoint) {
+                const pt = getCanvasPoint(e.clientX, e.clientY);
+                if (lineSnapshot) {
+                    lineCtx.putImageData(lineSnapshot, 0, 0);
+                } else {
+                    lineCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                    if (currentArtwork) {
+                        if (currentArtwork.isCustom) {
+                            // Handled via snapshot
+                        } else {
+                            currentArtwork.draw(lineCtx);
+                        }
+                    }
+                }
+                lineCtx.save();
+                lineCtx.strokeStyle = currentColor;
+                lineCtx.lineWidth = pencilSize;
+                lineCtx.lineCap = 'round';
+                lineCtx.lineJoin = 'round';
+                lineCtx.beginPath();
+                lineCtx.moveTo(lineStartPoint.x, lineStartPoint.y);
+                lineCtx.lineTo(pt.x, pt.y);
+                lineCtx.stroke();
+                lineCtx.restore();
+            } else if (currentTool === 'pan' || scale > 1) {
+                panX = e.clientX - pointerStartX;
+                panY = e.clientY - pointerStartY;
+                applyCanvasTransform();
+            }
+        });
+
+        window.addEventListener('pointerup', (e) => {
+            if (!isPointerDown || !e.isPrimary) return;
+            isPointerDown = false;
+
+            if (currentTool === 'pencil' && isDrawing) {
+                isDrawing = false;
+                saveProgress();
+                return;
+            }
+
+            const now = performance.now();
+            if (now - lastTapTime < 150) return;
+            lastTapTime = now;
+
+            const distMoved = Math.hypot(panX - initialPanX, panY - initialPanY);
+            if (currentTool === 'fill' && distMoved < 6) {
+                const pt = getCanvasPoint(e.clientX, e.clientY);
+                executeFloodFill(pt.x, pt.y, currentColor);
+            }
+        });
+
+        canvasContainer.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            if (currentTool === 'line') {
+                lineStartPoint = null;
+                if (lineSnapshot) {
+                    lineCtx.putImageData(lineSnapshot, 0, 0);
+                    lineSnapshot = null;
+                }
+            }
+        });
+
+        window.addEventListener('pointercancel', () => {
+            isPointerDown = false;
+            isDrawing = false;
+        });
+
+        viewport.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            const factor = e.deltaY < 0 ? 1.15 : 0.85;
+            scale = Math.min(Math.max(1, scale * factor), 5);
+            if (scale === 1) { panX = 0; panY = 0; }
+            applyCanvasTransform();
+        }, { passive: false });
+
+        imageUpload.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const img = new Image();
+                img.onload = function() {
+                    const offCanvas = document.createElement('canvas');
+                    offCanvas.width = CANVAS_SIZE;
+                    offCanvas.height = CANVAS_SIZE;
+                    const ctx = offCanvas.getContext('2d', { willReadFrequently: true });
+                    
+                    const scale = Math.min(CANVAS_SIZE / img.width, CANVAS_SIZE / img.height);
+                    const w = img.width * scale;
+                    const h = img.height * scale;
+                    const x = (CANVAS_SIZE - w) / 2;
+                    const y = (CANVAS_SIZE - h) / 2;
+                    
+                    ctx.drawImage(img, x, y, w, h);
+                    
+                    const imgData = ctx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                    const data = imgData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const r = data[i];
+                        const g = data[i+1];
+                        const b = data[i+2];
+                        const alpha = data[i+3];
+                        
+                        if (alpha < 50) {
+                            data[i+3] = 0;
+                            continue;
+                        }
+
+                        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+                        
+                        if (luminance > 160) {
+                            data[i+3] = 0;
+                        } else {
+                            data[i] = 0;
+                            data[i+1] = 0;
+                            data[i+2] = 0;
+                            data[i+3] = 255;
+                        }
+                    }
+                    ctx.putImageData(imgData, 0, 0);
+                    
+                    const newArt = {
+                        id: 'custom-' + Date.now(),
+                        title: 'Custom Upload',
+                        description: file.name || 'Your uploaded line art',
+                        isCustom: true,
+                        lineArtDataUrl: offCanvas.toDataURL('image/png')
+                    };
+                    
+                    customArtworks.unshift(newArt);
+                    
+                    if (customArtworks.length > 6) {
+                        const removed = customArtworks.pop();
+                        localStorage.removeItem(`coloring_studio_save_${removed.id}`);
+                    }
+                    
+                    safeSetStorage('coloring_studio_custom_arts', JSON.stringify(customArtworks));
+                    
+                    imageUpload.value = '';
+                    buildGallery();
+                    launchStudio(newArt);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+
+        paletteSelect.addEventListener('change', (e) => populatePalette(e.target.value));
+        customColorPicker.addEventListener('input', (e) => selectColor(e.target.value));
+        btnEraser.addEventListener('click', () => selectColor('#ffffff'));
+
+        btnFill.onclick = () => setToolMode('fill');
+        btnPencil.onclick = () => setToolMode('pencil');
+        btnLine.onclick = () => setToolMode('line');
+        btnPan.onclick = () => setToolMode('pan');
+
+        sizeBtns.forEach(btn => {
+            btn.onclick = (e) => {
+                e.stopPropagation();
+                setPencilSize(btn.getAttribute('data-size'));
+            };
+        });
+
+        if (pencilSizeSlider) {
+            pencilSizeSlider.oninput = (e) => {
+                setPencilSize(e.target.value);
+            };
+        }
+
+        btnZoomIn.onclick = () => { scale = Math.min(5, scale * 1.25); applyCanvasTransform(); };
+        btnZoomOut.onclick = () => { scale = Math.max(1, scale / 1.25); if (scale === 1) { panX = 0; panY = 0; } applyCanvasTransform(); };
+        btnZoomReset.onclick = resetZoomPan;
+
+        btnUndo.onclick = undo;
+
+        btnClear.onclick = () => {
+            try {
+                if (!currentArtwork || isProcessing) return;
+                paintCtx.fillStyle = '#ffffff';
+                paintCtx.fillRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                localStorage.removeItem(`coloring_studio_save_${currentArtwork.id}`);
+                undoStack = [];
+                undoStack.push(paintCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE));
+                updateUndoUI();
+                lineStartPoint = null;
+                lineSnapshot = null;
+                lineCtx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                if (currentArtwork.isCustom) {
+                    const img = new Image();
+                    img.onload = () => {
+                        lineCtx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                        lineSnapshot = lineCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                    };
+                    img.src = currentArtwork.lineArtDataUrl;
+                } else {
+                    currentArtwork.draw(lineCtx);
+                    lineSnapshot = lineCtx.getImageData(0, 0, CANVAS_SIZE, CANVAS_SIZE);
+                }
+            } catch(e) {
+                console.error('Error clearing canvas', e);
+            }
+        };
+
+        btnDownload.onclick = () => {
+            try {
+                if (!currentArtwork) return;
+                const exportCanvas = document.createElement('canvas');
+                exportCanvas.width = CANVAS_SIZE;
+                exportCanvas.height = CANVAS_SIZE;
+                const eCtx = exportCanvas.getContext('2d');
+                eCtx.drawImage(paintCanvas, 0, 0);
+                eCtx.drawImage(lineCanvas, 0, 0);
+
+                const a = document.createElement('a');
+                a.download = `${currentArtwork.id}-colored.png`;
+                a.href = exportCanvas.toDataURL('image/png');
+                a.click();
+            } catch(e) {
+                console.error('Error exporting image', e);
+            }
+        };
+
+        btnBack.onclick = () => {
+            try {
+                saveProgress();
+                workspaceScreen.classList.add('hidden');
+                homeScreen.classList.remove('hidden');
+                buildGallery();
+            } catch(e) {
+                console.error('Error navigating to gallery', e);
+            }
+        };
+
+        // App Initialization
+        try {
+            buildGallery();
+            populatePalette('jewel');
+        } catch(e) {
+            console.error('Error initializing Coloring Studio', e);
+        }
+    </script>
+</body>
+</html>
